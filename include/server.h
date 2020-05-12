@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -35,9 +36,9 @@ private:
     void doHandshake();
 
     void readFirstLine();
-    
+
     void readNextLine();
-  
+
     void readBody(int length);
 
     void doWrite(std::size_t length);
@@ -56,8 +57,7 @@ private:
     boost::asio::ip::tcp::acceptor acceptor_;
     boost::asio::ssl::context context_;
 
-    void accpet();
+    void accept();
 };
 
 #endif
-

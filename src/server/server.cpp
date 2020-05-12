@@ -19,24 +19,24 @@ using boost::asio::ip::tcp;
 
 /// A request received from a client.
 
-Session::Session(tcp::socket socket, asio::ssl::context& context) 
+Session::Session(tcp::socket socket, asio::ssl::context& context)
     : socket_(std::move(socket), context) {}
 
-void Session::start() 
+void Session::start()
 {
-    doHandshake(); 
+    doHandshake();
 }
 
 void Session::doHandshake()
 {
     auto self(shared_from_this());
-    socket_.async_handshake(asio::ssl::stream_base::server, 
-        [this, self](const system::error_code& error) {
-            if (!error)
-                readFirstLine();
-            else
-                fmt::print(fmt::fg(fmt::color::indian_red), "{}\n", error.message());
-        });
+    socket_.async_handshake(asio::ssl::stream_base::server,
+                            [this, self](const system::error_code& error) {
+                                if (!error)
+                                    readFirstLine();
+                                else
+                                    fmt::print(fmt::fg(fmt::color::indian_red), "{}\n", error.message());
+                            });
 }
 
 void Session::readFirstLine()
@@ -44,13 +44,13 @@ void Session::readFirstLine()
     auto self(shared_from_this());
     asio::async_read_until(
         socket_, buf, '\r',
-        [this, self](const system::error_code &ec, std::size_t s) {
+        [this, self](const system::error_code& ec, std::size_t s) {
             std::string line, ignore;
             std::istream stream{&buf};
             std::getline(stream, line, '\r');
             std::getline(stream, ignore, '\n');
 
-            if(line.empty())
+            if (line.empty())
                 return;
 
             std::stringstream{line} >> REQUEST_METHOD >> REQUEST_URI >> SERVER_PROTOCOL;
@@ -60,7 +60,7 @@ void Session::readFirstLine()
                 REQUEST_URI = REQUEST_URI.substr(0, pos);
             }
             SCRIPT_NAME = "." + REQUEST_URI;
-            
+
             readNextLine();
         });
 }
@@ -70,12 +70,12 @@ void Session::readNextLine()
     auto self(shared_from_this());
     asio::async_read_until(
         socket_, buf, '\r',
-        [this, self](const system::error_code &ec, std::size_t s) {
+        [this, self](const system::error_code& ec, std::size_t s) {
             std::string line, ignore;
             std::istream stream{&buf};
             std::getline(stream, line, '\r');
             std::getline(stream, ignore, '\n');
-            
+
             if (line.empty()) {
                 if (headers.count("Content-Length") == 0 || headers["Content-Length"] == "0")
                     doWrite(55688);
@@ -94,17 +94,17 @@ void Session::readNextLine()
 void Session::readBody(int length)
 {
     auto self(shared_from_this());
-    asio::async_read(socket_, buf, asio::transfer_exactly(length), 
-        [this, self, length](const system::error_code& ec, std::size_t s) {
-            std::istream stream{&buf};
-            std::stringstream ss;
-            ss << stream.rdbuf();
-            Base64::Encode(ss.str(), &payload);
+    asio::async_read(socket_, buf, asio::transfer_exactly(length),
+                     [this, self, length](const system::error_code& ec, std::size_t s) {
+                         std::istream stream{&buf};
+                         std::stringstream ss;
+                         ss << stream.rdbuf();
+                         Base64::Encode(ss.str(), &payload);
 
-            if (!ec)
-                doWrite(55688);
-        });
-}   
+                         if (!ec)
+                             doWrite(55688);
+                     });
+}
 
 void Session::doWrite(std::size_t length)
 {
@@ -141,6 +141,7 @@ void Session::setEnv()
     if (REQUEST_METHOD == "POST") {
         setenv("CONTENT_LENGTH", headers["Content-Length"].c_str(), 1);
     }
+    
 }
 
 void Session::response()
@@ -182,7 +183,7 @@ void Session::response()
 
         close(cgiOutput[1]);
         close(cgiInput[0]);
-        
+
         fs::current_path("./build/cgi-bin");
         if (REQUEST_METHOD == "GET" && REQUEST_URI == "/view.cgi/" &&
             QUERY_STRING.find("file=") != std::string::npos)
@@ -206,17 +207,15 @@ WebServer::WebServer(asio::io_context& ioContext, short port)
     context_.use_certificate_chain_file(".key/host.crt");
     context_.use_private_key_file(".key/host.key", asio::ssl::context::pem);
     context_.set_verify_mode(asio::ssl::context::verify_none);
-    accpet();
+    accept();
 }
 
-void WebServer::accpet()
+void WebServer::accept()
 {
     acceptor_.async_accept([this](const system::error_code& ec, tcp::socket socket) {
         if (!ec) {
             std::make_shared<Session>(std::move(socket), context_)->start();
         }
-        accpet();
+        accept();
     });
 }
-
-
